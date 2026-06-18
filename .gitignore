@@ -36,3 +36,5 @@ npm-debug.log*
 # Misc
 *.pem
 .vercel
+
+backend/credisure.db

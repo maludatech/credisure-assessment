@@ -127,3 +127,11 @@ Score calculated based on:
 3. Spending categorized using prompt engineering with GPT-4
 4. Risk summary generated based on spending patterns
 5. Results fed into credit assessment engine
+
+## Known Limitations
+
+The demo uses SQLite for simplicity. In production this would
+be replaced with AWS RDS MySQL for persistent, scalable storage.
+Render's free tier has an ephemeral filesystem so registered
+users may be lost on server restart — this is expected behavior
+for the demo environment.
