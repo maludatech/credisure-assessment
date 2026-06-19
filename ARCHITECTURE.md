@@ -10,29 +10,32 @@ CrediSure is a credit intelligence platform enabling users to register, complete
 
 ### Frontend Architecture
 
-- **Framework:** Next.js 15 with App Router and TypeScript
+- **Framework:** Next.js 16 with App Router and TypeScript
 - **Styling:** Tailwind CSS v4 with ShadCN UI components
 - **Auth:** JWT tokens stored in localStorage, validated on every protected route
 - **Pages:** Login, Register, Dashboard, Upload
+- **Dark Mode:** Forced globally via `dark` class on html element
+- **Form Validation:** Email regex, required field checks, password minimum length
 - **Hosting:** Vercel with automatic CI/CD from GitHub
 
 ### Backend Architecture
 
 - **Framework:** Python FastAPI
 - **Validation:** Pydantic v2 for request/response schema validation
-- **ORM:** SQLAlchemy with SQLite (demo) / MySQL (production)
+- **ORM:** SQLAlchemy with Neon PostgreSQL
 - **Auth:** JWT tokens via python-jose, bcrypt for password hashing
-- **Hosting:** Render (demo) / AWS ECS (production)
+- **Hosting:** Render (demo) / AWS ECS Fargate (production)
 
 ### Database Design
 
-- **Demo:** SQLite (file-based, no external service required)
-- **Production:** AWS RDS MySQL
+- **Demo + Production:** Neon PostgreSQL (persistent, serverless, free tier)
+- **ORM:** SQLAlchemy with psycopg2-binary driver
 - **Tables:** users, kyc_records, credit_assessments, uploaded_documents, loan_applications, businesses
+- **Persistence:** Data survives server restarts, no ephemeral storage concerns
 
 ### File Storage
 
-- **Demo:** File metadata stored in database only
+- **Demo:** File metadata stored in PostgreSQL only
 - **Production:** AWS S3 for PDF bank statements with pre-signed URLs for secure access
 
 ### Authentication Flow
@@ -59,17 +62,17 @@ Ratings: Poor / Fair / Good / Very Good / Excellent
 
 ### Services Used
 
-| Component     | AWS Service              | Purpose                           |
-| ------------- | ------------------------ | --------------------------------- |
-| Frontend      | Vercel / S3 + CloudFront | Next.js hosting and CDN           |
-| Backend       | ECS Fargate              | Containerized FastAPI             |
-| Database      | RDS MySQL (Multi-AZ)     | Persistent relational storage     |
-| File Storage  | S3                       | Bank statement PDF storage        |
-| Load Balancer | ALB                      | Traffic distribution              |
-| DNS           | Route 53                 | Domain management                 |
-| Secrets       | Secrets Manager          | API keys and DB credentials       |
-| Monitoring    | CloudWatch               | Logs, metrics, alarms             |
-| Cache         | ElastiCache Redis        | Session cache and AI result cache |
+| Component     | AWS Service               | Purpose                           |
+| ------------- | ------------------------- | --------------------------------- |
+| Frontend      | Vercel / S3 + CloudFront  | Next.js hosting and CDN           |
+| Backend       | ECS Fargate               | Containerized FastAPI             |
+| Database      | RDS PostgreSQL (Multi-AZ) | Persistent relational storage     |
+| File Storage  | S3                        | Bank statement PDF storage        |
+| Load Balancer | ALB                       | Traffic distribution              |
+| DNS           | Route 53                  | Domain management                 |
+| Secrets       | Secrets Manager           | API keys and DB credentials       |
+| Monitoring    | CloudWatch                | Logs, metrics, alarms             |
+| Cache         | ElastiCache Redis         | Session cache and AI result cache |
 
 ### Architecture Diagram (Text)
 
@@ -93,8 +96,8 @@ Ratings: Poor / Fair / Good / Very Good / Excellent
                     │
           ┌─────────┴──────────┐
           │                    │
-    RDS MySQL             S3 Bucket
-    (Multi-AZ)         (Bank Statements)
+    RDS PostgreSQL         S3 Bucket
+    (Multi-AZ)          (Bank Statements)
           │
     ElastiCache
       (Redis)
@@ -113,16 +116,17 @@ Ratings: Poor / Fair / Good / Very Good / Excellent
 **Application:**
 
 - All API keys stored in AWS Secrets Manager
-- S3 bucket private, access via pre-signed URLs only (15-minute expiry)
+- S3 bucket private: access via pre-signed URLs only (15-minute expiry)
 - JWT tokens with 24-hour expiry
 - HTTPS enforced everywhere via SSL/TLS certificates (ACM)
-- bcrypt password hashing with cost factor 12
+- bcrypt password hashing
 
 **Data:**
 
 - RDS encryption at rest enabled
 - S3 server-side encryption (AES-256)
 - CloudTrail for audit logging
+- SSL required on all database connections (`sslmode=require`)
 
 ### Scalability
 
@@ -174,19 +178,19 @@ Ratings: Poor / Fair / Good / Very Good / Excellent
 
 ### Estimated Monthly Cost (Production)
 
-| Service                           | Estimated Cost  |
-| --------------------------------- | --------------- |
-| ECS Fargate (2 tasks)             | ~$30            |
-| RDS MySQL (db.t3.medium Multi-AZ) | ~$80            |
-| S3 (100GB storage)                | ~$3             |
-| ALB                               | ~$20            |
-| ElastiCache (cache.t3.micro)      | ~$15            |
-| CloudFront                        | ~$5             |
-| **Total**                         | **~$153/month** |
+| Service                                | Estimated Cost  |
+| -------------------------------------- | --------------- |
+| ECS Fargate (2 tasks)                  | ~$30            |
+| RDS PostgreSQL (db.t3.medium Multi-AZ) | ~$80            |
+| S3 (100GB storage)                     | ~$3             |
+| ALB                                    | ~$20            |
+| ElastiCache (cache.t3.micro)           | ~$15            |
+| CloudFront                             | ~$5             |
+| **Total**                              | **~$153/month** |
 
 ---
 
-## Technology Choices & Justification
+## Technology Choices — Justification
 
 ### Why Next.js?
 
@@ -198,20 +202,23 @@ Ratings: Poor / Fair / Good / Very Good / Excellent
 ### Why FastAPI?
 
 - Python-native: aligns with AI/ML ecosystem
-- Automatic OpenAPI documentation
+- Automatic OpenAPI documentation at /docs
 - Pydantic integration for type-safe request validation
 - Async support for high-concurrency scenarios
 
 ### Why SQLAlchemy?
 
-- Database-agnostic ORM: switch from SQLite to MySQL with one config change
+- Database-agnostic ORM: switch between databases with one config change
 - Relationship mapping reduces boilerplate
 - Migration support via Alembic for production schema changes
 
-### Why SQLite for demo / MySQL for production?
+### Why Neon PostgreSQL?
 
-- SQLite: zero setup, file-based, perfect for demo environments
-- MySQL on RDS: ACID compliant, Multi-AZ, automated backups, scales to millions of records
+- Serverless PostgreSQL with persistent storage
+- Free tier sufficient for demo and early production
+- SSL enforced by default
+- No ephemeral storage issues unlike SQLite on Render
+- Scales to production with connection pooling via PgBouncer
 
 ### Why JWT?
 

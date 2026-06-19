@@ -22,75 +22,75 @@ users
 
 ### users
 
-| Column        | Type         | Constraints                 |
-| ------------- | ------------ | --------------------------- |
-| id            | INT          | PRIMARY KEY, AUTO_INCREMENT |
-| full_name     | VARCHAR(255) | NOT NULL                    |
-| email         | VARCHAR(255) | UNIQUE, NOT NULL, INDEX     |
-| password_hash | VARCHAR(255) | NOT NULL                    |
-| created_at    | DATETIME     | DEFAULT CURRENT_TIMESTAMP   |
+| Column        | Type         | Constraints               |
+| ------------- | ------------ | ------------------------- |
+| id            | SERIAL       | PRIMARY KEY               |
+| full_name     | VARCHAR(255) | NOT NULL                  |
+| email         | VARCHAR(255) | UNIQUE, NOT NULL, INDEX   |
+| password_hash | VARCHAR(255) | NOT NULL                  |
+| created_at    | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP |
 
 ### kyc_records
 
 | Column      | Type        | Constraints                      |
 | ----------- | ----------- | -------------------------------- |
-| id          | INT         | PRIMARY KEY, AUTO_INCREMENT      |
-| user_id     | INT         | FOREIGN KEY → users.id, NOT NULL |
+| id          | SERIAL      | PRIMARY KEY                      |
+| user_id     | INTEGER     | FOREIGN KEY → users.id, NOT NULL |
 | bvn         | VARCHAR(11) | NULLABLE                         |
 | nin         | VARCHAR(11) | NULLABLE                         |
 | kyc_status  | VARCHAR(20) | DEFAULT 'pending'                |
-| verified_at | DATETIME    | NULLABLE                         |
+| verified_at | TIMESTAMP   | NULLABLE                         |
 
 ### credit_assessments
 
 | Column            | Type          | Constraints                      |
 | ----------------- | ------------- | -------------------------------- |
-| id                | INT           | PRIMARY KEY, AUTO_INCREMENT      |
-| user_id           | INT           | FOREIGN KEY → users.id, NOT NULL |
-| monthly_income    | DECIMAL(15,2) | NOT NULL                         |
-| monthly_expense   | DECIMAL(15,2) | NOT NULL                         |
-| existing_loans    | DECIMAL(15,2) | DEFAULT 0                        |
-| credit_score      | INT           | NOT NULL                         |
+| id                | SERIAL        | PRIMARY KEY                      |
+| user_id           | INTEGER       | FOREIGN KEY → users.id, NOT NULL |
+| monthly_income    | NUMERIC(15,2) | NOT NULL                         |
+| monthly_expense   | NUMERIC(15,2) | NOT NULL                         |
+| existing_loans    | NUMERIC(15,2) | DEFAULT 0                        |
+| credit_score      | INTEGER       | NOT NULL                         |
 | rating            | VARCHAR(50)   | NOT NULL                         |
 | risk_level        | VARCHAR(50)   | NOT NULL                         |
 | funding_readiness | VARCHAR(20)   | NOT NULL                         |
-| assessed_at       | DATETIME      | DEFAULT CURRENT_TIMESTAMP        |
+| assessed_at       | TIMESTAMP     | DEFAULT CURRENT_TIMESTAMP        |
 
 ### uploaded_documents
 
 | Column        | Type         | Constraints                      |
 | ------------- | ------------ | -------------------------------- |
-| id            | INT          | PRIMARY KEY, AUTO_INCREMENT      |
-| user_id       | INT          | FOREIGN KEY → users.id, NOT NULL |
+| id            | SERIAL       | PRIMARY KEY                      |
+| user_id       | INTEGER      | FOREIGN KEY → users.id, NOT NULL |
 | file_name     | VARCHAR(255) | NOT NULL                         |
-| file_size     | INT          | NULLABLE                         |
+| file_size     | INTEGER      | NULLABLE                         |
 | document_type | VARCHAR(50)  | DEFAULT 'bank_statement'         |
-| uploaded_at   | DATETIME     | DEFAULT CURRENT_TIMESTAMP        |
+| uploaded_at   | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP        |
 | status        | VARCHAR(20)  | DEFAULT 'processing'             |
 
 ### loan_applications
 
 | Column           | Type          | Constraints                                   |
 | ---------------- | ------------- | --------------------------------------------- |
-| id               | INT           | PRIMARY KEY, AUTO_INCREMENT                   |
-| user_id          | INT           | FOREIGN KEY → users.id, NOT NULL              |
-| assessment_id    | INT           | FOREIGN KEY → credit_assessments.id, NOT NULL |
-| amount_requested | DECIMAL(15,2) | NOT NULL                                      |
+| id               | SERIAL        | PRIMARY KEY                                   |
+| user_id          | INTEGER       | FOREIGN KEY → users.id, NOT NULL              |
+| assessment_id    | INTEGER       | FOREIGN KEY → credit_assessments.id, NOT NULL |
+| amount_requested | NUMERIC(15,2) | NOT NULL                                      |
 | purpose          | VARCHAR(500)  | NULLABLE                                      |
 | status           | VARCHAR(20)   | DEFAULT 'pending'                             |
-| applied_at       | DATETIME      | DEFAULT CURRENT_TIMESTAMP                     |
+| applied_at       | TIMESTAMP     | DEFAULT CURRENT_TIMESTAMP                     |
 
 ### businesses
 
 | Column              | Type          | Constraints                      |
 | ------------------- | ------------- | -------------------------------- |
-| id                  | INT           | PRIMARY KEY, AUTO_INCREMENT      |
-| user_id             | INT           | FOREIGN KEY → users.id, NOT NULL |
+| id                  | SERIAL        | PRIMARY KEY                      |
+| user_id             | INTEGER       | FOREIGN KEY → users.id, NOT NULL |
 | business_name       | VARCHAR(255)  | NOT NULL                         |
 | registration_number | VARCHAR(100)  | NULLABLE                         |
 | industry            | VARCHAR(100)  | NULLABLE                         |
-| annual_revenue      | DECIMAL(15,2) | NULLABLE                         |
-| created_at          | DATETIME      | DEFAULT CURRENT_TIMESTAMP        |
+| annual_revenue      | NUMERIC(15,2) | NULLABLE                         |
+| created_at          | TIMESTAMP     | DEFAULT CURRENT_TIMESTAMP        |
 
 ---
 
@@ -105,73 +105,80 @@ users
 
 ---
 
-## MySQL DDL
+## PostgreSQL DDL
 
 ```sql
 CREATE TABLE users (
-  id INT PRIMARY KEY AUTO_INCREMENT,
+  id SERIAL PRIMARY KEY,
   full_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_email (email)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_users_email ON users(email);
+
 CREATE TABLE kyc_records (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
   bvn VARCHAR(11),
   nin VARCHAR(11),
   kyc_status VARCHAR(20) DEFAULT 'pending',
-  verified_at DATETIME,
+  verified_at TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE credit_assessments (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
-  monthly_income DECIMAL(15,2) NOT NULL,
-  monthly_expense DECIMAL(15,2) NOT NULL,
-  existing_loans DECIMAL(15,2) DEFAULT 0,
-  credit_score INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  monthly_income NUMERIC(15,2) NOT NULL,
+  monthly_expense NUMERIC(15,2) NOT NULL,
+  existing_loans NUMERIC(15,2) DEFAULT 0,
+  credit_score INTEGER NOT NULL,
   rating VARCHAR(50) NOT NULL,
   risk_level VARCHAR(50) NOT NULL,
   funding_readiness VARCHAR(20) NOT NULL,
-  assessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  assessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE uploaded_documents (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
   file_name VARCHAR(255) NOT NULL,
-  file_size INT,
+  file_size INTEGER,
   document_type VARCHAR(50) DEFAULT 'bank_statement',
-  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   status VARCHAR(20) DEFAULT 'processing',
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE loan_applications (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
-  assessment_id INT NOT NULL,
-  amount_requested DECIMAL(15,2) NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  assessment_id INTEGER NOT NULL,
+  amount_requested NUMERIC(15,2) NOT NULL,
   purpose VARCHAR(500),
   status VARCHAR(20) DEFAULT 'pending',
-  applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (assessment_id) REFERENCES credit_assessments(id)
 );
 
 CREATE TABLE businesses (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
   business_name VARCHAR(255) NOT NULL,
   registration_number VARCHAR(100),
   industry VARCHAR(100),
-  annual_revenue DECIMAL(15,2),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  annual_revenue NUMERIC(15,2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
+
+---
+
+## Implementation Notes
+
+The database is hosted on **Neon PostgreSQL**, a serverless PostgreSQL platform with persistent storage. SQLAlchemy handles all schema creation automatically via `Base.metadata.create_all()` on startup. All connections use `sslmode=require` for encrypted communication in transit.

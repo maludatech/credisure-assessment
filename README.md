@@ -12,7 +12,7 @@ A full-stack credit intelligence platform built as part of the CrediSure Financi
 
 ```
 credisure-assessment/
-├── frontend/                    # Next.js 15, TypeScript, TailwindCSS
+├── frontend/                    # Next.js 16, TypeScript, TailwindCSS
 │   ├── app/
 │   │   ├── page.tsx             # Login page
 │   │   ├── register/page.tsx    # Register page
@@ -33,9 +33,9 @@ credisure-assessment/
 
 | Layer    | Technology                                        |
 | -------- | ------------------------------------------------- |
-| Frontend | Next.js 15, TypeScript, TailwindCSS v4, ShadCN UI |
+| Frontend | Next.js 16, TypeScript, TailwindCSS v4, ShadCN UI |
 | Backend  | Python 3.11, FastAPI, Pydantic, SQLAlchemy        |
-| Database | SQLite (demo) / MySQL (production)                |
+| Database | Neon PostgreSQL (persistent, serverless)          |
 | Auth     | JWT via python-jose, bcrypt password hashing      |
 | Hosting  | Vercel (frontend) + Render (backend)              |
 
@@ -78,7 +78,7 @@ Create `.env`:
 
 ```
 SECRET_KEY=your-secret-key-here
-DATABASE_URL=sqlite:///./credisure.db
+DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 ```
 
 ```bash
@@ -131,12 +131,12 @@ Response:
 
 Six tables with full relationships:
 
-- **users** — account credentials and profile
-- **kyc_records** — KYC verification status (BVN, NIN)
-- **credit_assessments** — credit score history per user
-- **uploaded_documents** — bank statement metadata
-- **loan_applications** — funding applications linked to assessments
-- **businesses** — business profile for SME users
+- **users**: account credentials and profile
+- **kyc_records**: KYC verification status (BVN, NIN)
+- **credit_assessments**: credit score history per user
+- **uploaded_documents**: bank statement metadata
+- **loan_applications**: funding applications linked to assessments
+- **businesses**: business profile for SME users
 
 See `DATABASE.md` for full ER diagram and table structures.
 
@@ -166,13 +166,11 @@ Score range: 300-850
 
 ## Known Limitations
 
-The demo uses SQLite for zero-configuration simplicity. In production this would be replaced with AWS RDS MySQL for persistent, scalable storage. Render's free tier has an ephemeral filesystem so registered users may be lost on server restart, this is expected behavior for the demo environment.
-
-File uploads store metadata only in the demo. Production would use AWS S3 for actual PDF storage with pre-signed URLs for secure access.
+File uploads store metadata only in the demo. Production would use AWS S3 for actual PDF storage with pre-signed URLs for secure access. The AI parsing pipeline (PDF extraction, transaction categorization, risk summary generation) is documented in AI_ENGINEERING.md as a design specification, the full implementation would connect the upload endpoint to the Parse AI workflow described there.
 
 ## Architecture
 
-See `ARCHITECTURE.md` for full system design including AWS cloud deployment diagram, security model, scalability approach, and cost estimates.
+See `ARCHITECTURE.md` for full system design including AWS cloud deployment diagram, security model, scalability approach and cost estimates.
 
 ## AI Engineering
 

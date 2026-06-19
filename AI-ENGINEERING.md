@@ -1,14 +1,14 @@
-# Part 5: AI Engineering - CrediSure Parse AI
+# Part 5: AI Engineering: CrediSure Parse AI
 
 ## Scenario
 
-CrediSure Parse AI receives a bank statement PDF and must extract transactions, categorize spending, and generate a risk summary for credit assessment.
+CrediSure Parse AI receives a bank statement PDF and must extract transactions, categorize spending and generate a risk summary for credit assessment.
 
 ---
 
 ## 1. How would you extract text from PDFs?
 
-I'll Use **pdfplumber** as the primary extraction library, it handles both text-based and scanned PDFs reliably.
+Use **pdfplumber** as the primary extraction library, it handles both text-based and scanned PDFs reliably.
 
 ```python
 import pdfplumber
@@ -56,28 +56,35 @@ After extraction, parse raw text into structured JSON:
     "to": "2026-01-31"
   },
   "opening_balance": 150000.0,
-  "closing_balance": 87500.0,
+  "closing_balance": 373000.0,
   "transactions": [
     {
       "date": "2026-01-03",
-      "description": "TRANSFER FROM EMPLOYER",
+      "description": "SALARY PAYMENT - EMPLOYER",
       "amount": 500000.0,
       "type": "credit",
       "category": "income"
     },
     {
       "date": "2026-01-05",
-      "description": "JUMIA PAYMENT",
+      "description": "JUMIA ONLINE SHOPPING",
       "amount": 15000.0,
       "type": "debit",
       "category": "shopping"
+    },
+    {
+      "date": "2026-01-10",
+      "description": "RENT PAYMENT - LANDLORD",
+      "amount": 80000.0,
+      "type": "debit",
+      "category": "rent"
     }
   ],
   "summary": {
     "total_credits": 500000.0,
-    "total_debits": 412500.0,
-    "net_flow": 87500.0,
-    "transaction_count": 47
+    "total_debits": 277000.0,
+    "net_flow": 223000.0,
+    "transaction_count": 15
   }
 }
 ```
@@ -112,7 +119,7 @@ def categorize_by_keyword(description: str) -> str:
 ```
 
 **Layer 2: AI fallback for uncategorized transactions:**
-Send only uncategorized transactions to GPT-4o-mini for classification. This keeps AI costs low.
+Send only uncategorized transactions to GPT-4o-mini for classification. This keeps AI costs low while handling edge cases keyword matching can't cover.
 
 ---
 
@@ -122,15 +129,15 @@ Send only uncategorized transactions to GPT-4o-mini for classification. This kee
 
 **Why not Fine-Tuning:**
 
-- Requires large labeled dataset of Nigerian bank transactions
+- Requires a large labeled dataset of Nigerian bank transactions
 - Expensive to train and maintain
 - Overkill for transaction categorization where patterns are consistent
 
 **Why not RAG:**
 
-- RAG is best for knowledge retrieval from documents
+- RAG is best for knowledge retrieval from a document corpus
 - Transaction categorization is a classification task, not a retrieval task
-- Adds unnecessary complexity and latency
+- Adds unnecessary complexity and latency for no benefit here
 
 **Why Prompt Engineering:**
 
@@ -157,23 +164,23 @@ Respond with only the category name, nothing else.
 ## 5. How would you reduce AI costs?
 
 **Strategy 1: Keyword pre-filtering (most impactful)**
-Run keyword matching first. Only send unmatched transactions to the AI. In practice 60-70% of transactions match keywords, reducing AI calls by the same amount.
+Run keyword matching first. Only send unmatched transactions to the AI. In practice 60-70% of Nigerian bank transactions match known keywords, reducing AI calls by the same amount.
 
 **Strategy 2: Batch processing**
 Instead of one API call per transaction, batch 20 transactions per prompt:
 
 ```
-Categorize these 20 transactions and return a JSON array of categories...
+Categorize these 20 transactions and return a JSON array of categories in the same order...
 ```
 
 **Strategy 3: Use GPT-4o-mini instead of GPT-4**
-GPT-4o-mini costs 95% less than GPT-4 and is accurate enough for transaction categorization.
+GPT-4o-mini costs 95% less than GPT-4 and is accurate enough for transaction categorization which is a simple classification task.
 
 **Strategy 4: Cache common descriptions**
-Store categorization results in Redis. If the same merchant description appears again, return cached result without an API call.
+Store categorization results in Redis. If the same merchant description appears again (e.g. "JUMIA ONLINE SHOPPING"), return the cached result without an API call.
 
 **Strategy 5: Process asynchronously**
-Run AI categorization as a background job after upload. User gets immediate upload confirmation while AI processes in the background. No latency cost paid at upload time.
+Run AI categorization as a background job after upload. The user gets an immediate upload confirmation while AI processes in the background. No latency cost is paid at upload time.
 
 **Estimated cost reduction: 85-90% vs naive one-call-per-transaction approach.**
 
@@ -184,17 +191,42 @@ Run AI categorization as a background job after upload. User gets immediate uplo
 ```
 PDF Upload
     ↓
-Text Extraction (pdfplumber / Tesseract OCR)
+Text Extraction (pdfplumber / Tesseract OCR fallback)
     ↓
 Transaction Parsing (regex + structured JSON)
     ↓
-Keyword Categorization (free, instant)
+Keyword Categorization (free, instant — covers ~65% of transactions)
     ↓
-Uncategorized transactions → GPT-4o-mini (batched)
+Uncategorized transactions → GPT-4o-mini (batched, ~35% of transactions)
     ↓
-Merged categorized transactions
+Merged categorized transaction list
     ↓
 Spending summary generation
     ↓
-Risk summary → Credit Assessment Engine
+Risk summary → Credit Assessment Engine → Credit Score
 ```
+
+---
+
+## Integration with Upload Endpoint
+
+In production, the `/upload-statement` endpoint would trigger this workflow asynchronously after storing the file in S3:
+
+```python
+@app.post("/upload-statement")
+async def upload_statement(file: UploadFile, background_tasks: BackgroundTasks, ...):
+    # 1. Store file in S3
+    s3_url = await upload_to_s3(file)
+
+    # 2. Save metadata to database
+    document = UploadedDocument(user_id=user.id, file_name=file.filename, ...)
+    db.add(document)
+    db.commit()
+
+    # 3. Trigger AI parsing in background
+    background_tasks.add_task(parse_bank_statement, document.id, s3_url)
+
+    return {"message": "Upload successful", "status": "processing"}
+```
+
+The background task runs the full Parse AI pipeline and updates the credit assessment once complete.
