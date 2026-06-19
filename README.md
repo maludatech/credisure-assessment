@@ -166,7 +166,7 @@ Score range: 300-850
 
 ## Known Limitations
 
-The demo uses SQLite for zero-configuration simplicity. In production this would be replaced with AWS RDS MySQL for persistent, scalable storage. Render's free tier has an ephemeral filesystem so registered users may be lost on server restart — this is expected behavior for the demo environment.
+The demo uses SQLite for zero-configuration simplicity. In production this would be replaced with AWS RDS MySQL for persistent, scalable storage. Render's free tier has an ephemeral filesystem so registered users may be lost on server restart, this is expected behavior for the demo environment.
 
 File uploads store metadata only in the demo. Production would use AWS S3 for actual PDF storage with pre-signed URLs for secure access.
 
