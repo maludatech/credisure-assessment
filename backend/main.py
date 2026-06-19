@@ -2,12 +2,12 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
-from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Enum
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
+import bcrypt
 import os
 from dotenv import load_dotenv
 
@@ -15,11 +15,15 @@ load_dotenv()
 
 # ── Database Setup
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./credisure.db")
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# ── Models
+
+# ── SQLAlchemy Models
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -30,6 +34,9 @@ class User(Base):
     assessments = relationship("CreditAssessment", back_populates="user")
     documents = relationship("UploadedDocument", back_populates="user")
     kyc = relationship("KYCRecord", back_populates="user", uselist=False)
+    businesses = relationship("Business", back_populates="user")
+    loan_applications = relationship("LoanApplication", back_populates="user")
+
 
 class KYCRecord(Base):
     __tablename__ = "kyc_records"
@@ -41,6 +48,7 @@ class KYCRecord(Base):
     verified_at = Column(DateTime, nullable=True)
     user = relationship("User", back_populates="kyc")
 
+
 class CreditAssessment(Base):
     __tablename__ = "credit_assessments"
     id = Column(Integer, primary_key=True, index=True)
@@ -51,8 +59,11 @@ class CreditAssessment(Base):
     credit_score = Column(Integer, nullable=False)
     rating = Column(String(50), nullable=False)
     risk_level = Column(String(50), nullable=False)
+    funding_readiness = Column(String(20), default="Not Ready")
     assessed_at = Column(DateTime, default=datetime.utcnow)
     user = relationship("User", back_populates="assessments")
+    loan_applications = relationship("LoanApplication", back_populates="assessment")
+
 
 class UploadedDocument(Base):
     __tablename__ = "uploaded_documents"
@@ -65,6 +76,7 @@ class UploadedDocument(Base):
     status = Column(String(20), default="processing")
     user = relationship("User", back_populates="documents")
 
+
 class LoanApplication(Base):
     __tablename__ = "loan_applications"
     id = Column(Integer, primary_key=True, index=True)
@@ -74,6 +86,9 @@ class LoanApplication(Base):
     purpose = Column(String(500))
     status = Column(String(20), default="pending")
     applied_at = Column(DateTime, default=datetime.utcnow)
+    user = relationship("User", back_populates="loan_applications")
+    assessment = relationship("CreditAssessment", back_populates="loan_applications")
+
 
 class Business(Base):
     __tablename__ = "businesses"
@@ -84,6 +99,8 @@ class Business(Base):
     industry = Column(String(100))
     annual_revenue = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
+    user = relationship("User", back_populates="businesses")
+
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -103,9 +120,8 @@ app.add_middleware(
 SECRET_KEY = os.getenv("SECRET_KEY", "credisure-secret-key-2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
 
 # ── DB Dependency
 def get_db():
@@ -115,32 +131,41 @@ def get_db():
     finally:
         db.close()
 
+
 # ── Pydantic Schemas
 class RegisterRequest(BaseModel):
     full_name: str
     email: EmailStr
     password: str
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
 
 class AssessmentRequest(BaseModel):
     monthly_income: float
     monthly_expense: float
     existing_loans: float = 0
 
+
 # ── Helpers
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+
 
 def create_token(data: dict) -> str:
     payload = data.copy()
     payload["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -158,6 +183,7 @@ def get_current_user(
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 def calculate_credit_score(
     monthly_income: float,
@@ -216,14 +242,17 @@ def calculate_credit_score(
         "funding_readiness": "Ready" if score >= 670 else "Not Ready"
     }
 
+
 # ── Routes
 @app.get("/")
 def root():
     return {"message": "CrediSure API", "version": "1.0.0", "status": "running"}
 
+
 @app.get("/health")
 def health():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
 
 @app.post("/register")
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
@@ -247,6 +276,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         "user": {"full_name": user.full_name, "email": user.email}
     }
 
+
 @app.post("/login")
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
@@ -259,6 +289,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": {"full_name": user.full_name, "email": user.email}
     }
+
 
 @app.post("/assessment")
 def assess_credit(
@@ -279,12 +310,14 @@ def assess_credit(
         existing_loans=body.existing_loans,
         credit_score=result["credit_score"],
         rating=result["rating"],
-        risk_level=result["risk_level"]
+        risk_level=result["risk_level"],
+        funding_readiness=result["funding_readiness"]
     )
     db.add(assessment)
     db.commit()
 
     return result
+
 
 @app.post("/upload-statement")
 def upload_statement(
@@ -304,6 +337,7 @@ def upload_statement(
     )
     db.add(document)
     db.commit()
+    db.refresh(document)
 
     return {
         "message": "Bank statement uploaded successfully",
@@ -311,6 +345,7 @@ def upload_statement(
         "status": "processing",
         "uploaded_at": document.uploaded_at.isoformat()
     }
+
 
 @app.get("/me")
 def get_profile(current_user: User = Depends(get_current_user)):
