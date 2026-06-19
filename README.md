@@ -1,137 +1,179 @@
 # CrediSure Full Stack Assessment
 
-A full-stack credit intelligence platform built as part of
-the CrediSure Financial Technologies engineering assessment.
-
-## Project Structure
-
-credisure-assessment/
-├── frontend/ # Next.js 15, TypeScript, TailwindCSS
-└── backend/ # Python FastAPI, SQLAlchemy, MySQL
+A full-stack credit intelligence platform built as part of the CrediSure Financial Technologies engineering assessment.
 
 ## Live Demo
 
-- Frontend: [coming soon]
-- Backend API: [coming soon]
+- **Frontend:** https://credisure-assessment.vercel.app
+- **Backend API:** https://credisure-assessment.onrender.com
+- **API Docs:** https://credisure-assessment.onrender.com/docs
+
+## Project Structure
+
+```
+credisure-assessment/
+├── frontend/                    # Next.js 15, TypeScript, TailwindCSS
+│   ├── app/
+│   │   ├── page.tsx             # Login page
+│   │   ├── register/page.tsx    # Register page
+│   │   ├── dashboard/page.tsx   # Dashboard with credit score
+│   │   └── upload/page.tsx      # Bank statement upload
+│   └── components/ui/           # ShadCN UI components
+├── backend/                     # Python FastAPI
+│   ├── main.py                  # All API routes and database models
+│   ├── requirements.txt         # Python dependencies
+│   └── runtime.txt              # Python version for Render
+├── README.md
+├── ARCHITECTURE.md              # System design and cloud architecture
+├── AI_ENGINEERING.md            # AI workflow documentation
+└── DATABASE.md                  # Database schema and ER diagram
+```
 
 ## Tech Stack
 
-| Layer        | Technology                          |
-| ------------ | ----------------------------------- |
-| Frontend     | Next.js 15, TypeScript, TailwindCSS |
-| Backend      | Python, FastAPI, SQLAlchemy         |
-| Database     | MySQL                               |
-| Auth         | JWT                                 |
-| File Storage | AWS S3                              |
-| Hosting      | Vercel + Render                     |
+| Layer    | Technology                                        |
+| -------- | ------------------------------------------------- |
+| Frontend | Next.js 15, TypeScript, TailwindCSS v4, ShadCN UI |
+| Backend  | Python 3.11, FastAPI, Pydantic, SQLAlchemy        |
+| Database | SQLite (demo) / MySQL (production)                |
+| Auth     | JWT via python-jose, bcrypt password hashing      |
+| Hosting  | Vercel (frontend) + Render (backend)              |
 
 ## Setup Instructions
+
+### Prerequisites
+
+- Node.js 18+
+- Python 3.11+
 
 ### Frontend
 
 ```bash
 cd frontend
 npm install
+```
+
+Create `.env.local`:
+
+```
+NEXT_PUBLIC_API_URL=https://credisure-assessment.onrender.com
+```
+
+```bash
 npm run dev
 ```
+
+Open http://localhost:3000
 
 ### Backend
 
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload
 ```
 
-## Architecture
+Create `.env`:
 
-See ARCHITECTURE.md for full system design documentation.
+```
+SECRET_KEY=your-secret-key-here
+DATABASE_URL=sqlite:///./credisure.db
+```
 
-## API Documentation
+```bash
+python -m uvicorn main:app --reload
+```
 
-See backend/README.md for API endpoint documentation.
+API runs at http://localhost:8000
+API docs at http://localhost:8000/docs
+
+## API Endpoints
+
+| Method | Endpoint          | Description                 | Auth |
+| ------ | ----------------- | --------------------------- | ---- |
+| POST   | /register         | Create account, returns JWT | No   |
+| POST   | /login            | Login, returns JWT          | No   |
+| POST   | /assessment       | Calculate credit score      | Yes  |
+| POST   | /upload-statement | Upload PDF bank statement   | Yes  |
+| GET    | /me               | Get current user profile    | Yes  |
+| GET    | /health           | Health check                | No   |
+
+### Register
+
+```bash
+curl -X POST https://credisure-assessment.onrender.com/register \
+  -H "Content-Type: application/json" \
+  -d '{"full_name": "Victor Ugochukwu", "email": "victor@example.com", "password": "password123"}'
+```
+
+### Credit Assessment
+
+```bash
+curl -X POST https://credisure-assessment.onrender.com/assessment \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"monthly_income": 500000, "monthly_expense": 250000, "existing_loans": 50000}'
+```
+
+Response:
+
+```json
+{
+  "credit_score": 780,
+  "rating": "Very Good",
+  "risk_level": "Low Risk",
+  "funding_readiness": "Ready"
+}
+```
 
 ## Database Schema
 
-See DATABASE.md for ER diagram and table structures.
+Six tables with full relationships:
 
-## System Architecture
+- **users** — account credentials and profile
+- **kyc_records** — KYC verification status (BVN, NIN)
+- **credit_assessments** — credit score history per user
+- **uploaded_documents** — bank statement metadata
+- **loan_applications** — funding applications linked to assessments
+- **businesses** — business profile for SME users
 
-### Overview
+See `DATABASE.md` for full ER diagram and table structures.
 
-CrediSure is a credit intelligence platform that enables
-users to register, complete KYC, upload bank statements,
-receive credit assessments, and apply for funding.
+## Credit Score Algorithm
 
-### Frontend — Next.js on Vercel
+Score calculated based on three financial ratios:
 
-- Next.js 15 App Router with TypeScript and TailwindCSS
-- JWT stored in httpOnly cookies for security
-- Three core pages: Login, Dashboard, Upload
-- Responsive across mobile and desktop
+| Factor                        | Impact      |
+| ----------------------------- | ----------- |
+| Expense ratio > 80% of income | -200 points |
+| Expense ratio 60-80%          | -120 points |
+| Expense ratio 40-60%          | -60 points  |
+| Loan ratio > 40% of income    | -150 points |
+| Loan ratio 20-40%             | -80 points  |
+| Savings rate > 30%            | +50 points  |
+| Negative savings rate         | -100 points |
 
-### Backend — FastAPI on Render
+Score range: 300-850
 
-- Python FastAPI with Pydantic for request validation
-- SQLAlchemy ORM for MySQL database interaction
-- JWT authentication with access tokens
-- RESTful API design with proper error handling
-
-### Database — MySQL
-
-- Six relational tables: Users, KYC Records,
-  Credit Assessments, Uploaded Documents,
-  Loan Applications, Businesses
-- Foreign key relationships maintaining data integrity
-- Indexed on user_id for query performance
-
-### File Storage — AWS S3
-
-- Bank statement PDFs uploaded to S3
-- Pre-signed URLs for secure file access
-- File metadata stored in MySQL
-
-### Authentication Flow
-
-1. User registers → password hashed with bcrypt
-2. User logs in → JWT access token returned
-3. Token sent in Authorization header on protected routes
-4. Token verified on every protected endpoint
-
-### Credit Score Algorithm
-
-Score calculated based on:
-
-- Debt-to-income ratio
-- Expense-to-income ratio
-- Existing loan burden
-  Score range: 300-850
-  Ratings: Poor / Fair / Good / Very Good / Excellent
-
-### Cloud Deployment — AWS
-
-- Frontend: Vercel (automatic CI/CD from GitHub)
-- Backend: Render or AWS ECS
-- Database: AWS RDS MySQL
-- Storage: AWS S3
-- CDN: AWS CloudFront
-- Monitoring: AWS CloudWatch
-- Backups: Automated RDS snapshots daily
-
-### AI Engineering — Parse AI Workflow
-
-1. PDF received → text extracted using PyMuPDF/pdfplumber
-2. Transactions parsed and structured into JSON
-3. Spending categorized using prompt engineering with GPT-4
-4. Risk summary generated based on spending patterns
-5. Results fed into credit assessment engine
+| Score   | Rating    | Risk Level     |
+| ------- | --------- | -------------- |
+| 800-850 | Excellent | Very Low Risk  |
+| 740-799 | Very Good | Low Risk       |
+| 670-739 | Good      | Moderate Risk  |
+| 580-669 | Fair      | High Risk      |
+| 300-579 | Poor      | Very High Risk |
 
 ## Known Limitations
 
-The demo uses SQLite for simplicity. In production this would
-be replaced with AWS RDS MySQL for persistent, scalable storage.
-Render's free tier has an ephemeral filesystem so registered
-users may be lost on server restart — this is expected behavior
-for the demo environment.
+The demo uses SQLite for zero-configuration simplicity. In production this would be replaced with AWS RDS MySQL for persistent, scalable storage. Render's free tier has an ephemeral filesystem so registered users may be lost on server restart — this is expected behavior for the demo environment.
+
+File uploads store metadata only in the demo. Production would use AWS S3 for actual PDF storage with pre-signed URLs for secure access.
+
+## Architecture
+
+See `ARCHITECTURE.md` for full system design including AWS cloud deployment diagram, security model, scalability approach, and cost estimates.
+
+## AI Engineering
+
+See `AI_ENGINEERING.md` for the complete AI workflow for bank statement parsing including PDF extraction, transaction categorization, prompt engineering approach, and cost reduction strategies.
